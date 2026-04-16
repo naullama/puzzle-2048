@@ -15,7 +15,10 @@ public class BuildScript
         buildPlayerOptions.target = BuildTarget.WebGL;
         buildPlayerOptions.options = BuildOptions.None;
 
-        Debug.Log($"Building WebGL to: {outputPath}");
+        // GitHub Pages does not serve Content-Encoding: gzip headers,
+        // so disable compression to serve plain files directly.
+        PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Disabled;
+        Debug.Log($"Building WebGL to: {outputPath} (compression: disabled)");
         BuildReport report = BuildPipeline.BuildPlayer(buildPlayerOptions);
 
         if (report.summary.result == BuildResult.Succeeded)
