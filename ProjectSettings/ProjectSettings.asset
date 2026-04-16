@@ -1,0 +1,205 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!129 &1
+PlayerSettings:
+  m_ObjectHideFlags: 0
+  serializedVersion: 24
+  productGUID: 4e1a3b2c5d6e7f8a9b0c1d2e3f4a5b6c
+  AndroidProfiler: 0
+  AndroidFilterTouchesWhenObscured: 0
+  AndroidEnableSustainedPerformanceMode: 0
+  defaultScreenOrientation: 4
+  targetDevice: 2
+  useOnDemandResources: 0
+  accelerometerFrequency: 60
+  companyName: naullama
+  productName: puzzle-2048
+  defaultCursor: {fileID: 0}
+  cursorHotspot: {x: 0, y: 0}
+  m_SplashScreenBackgroundColor: {r: 0.13333334, g: 0.17254902, b: 0.21568628, a: 1}
+  m_ShowUnitySplashScreen: 0
+  m_ShowUnitySplashLogo: 0
+  m_SplashScreenOverlayOpacity: 1
+  m_SplashScreenAnimation: 1
+  m_SplashScreenLogoStyle: 1
+  m_SplashScreenDrawMode: 0
+  m_SplashScreenBackgroundAnimationZoom: 1
+  m_SplashScreenLogoAnimationZoom: 1
+  m_SplashScreenBackgroundLandscapeAspect: 1
+  m_SplashScreenBackgroundPortraitAspect: 1
+  m_SplashScreenBackgroundLandscapeUvs:
+    serializedVersion: 2
+    x: 0
+    y: 0
+    width: 1
+    height: 1
+  m_SplashScreenBackgroundPortraitUvs:
+    serializedVersion: 2
+    x: 0
+    y: 0
+    width: 1
+    height: 1
+  m_SplashScreenLogos: []
+  m_VirtualRealitySplashScreen: {fileID: 0}
+  m_HolographicTrackingLossScreen: {fileID: 0}
+  defaultScreenWidth: 1280
+  defaultScreenHeight: 720
+  defaultScreenWidthWeb: 960
+  defaultScreenHeightWeb: 600
+  m_StereoRenderingPath: 0
+  m_ActiveColorSpace: 0
+  m_SpriteBatchVertexThreshold: 300
+  m_MTRendering: 1
+  stackTraceTypes: 010000000100000001000000010000000100000001000000
+  iosShowActivityIndicatorOnLoading: -1
+  androidShowActivityIndicatorOnLoading: -1
+  iosUseCustomAppBackgroundBehavior: 0
+  iosAllowHTTPDownload: 1
+  allowedAutorotateToPortrait: 1
+  allowedAutorotateToPortraitUpsideDown: 1
+  allowedAutorotateToLandscapeRight: 1
+  allowedAutorotateToLandscapeLeft: 1
+  useOSAutorotation: 1
+  use32BitDisplayBuffer: 1
+  preserveFramebufferAlpha: 0
+  disableDepthAndStencilBuffers: 0
+  androidStartInFullscreen: 1
+  androidRenderOutsideSafeArea: 1
+  androidUseSwappyForVulkanSwapchain: 1
+  androidBlitType: 0
+  androidResizableWindow: 0
+  androidDefaultWindowWidth: 1920
+  androidDefaultWindowHeight: 1080
+  androidMinimumWindowWidth: 400
+  androidMinimumWindowHeight: 300
+  androidFullscreenMode: 1
+  defaultIsNativeResolution: 1
+  macRetinaSupport: 1
+  runInBackground: 1
+  captureSingleScreen: 0
+  muteOtherAudioSources: 0
+  Prepare IOS For Recording: 0
+  Force IOS Speakers When Recording: 0
+  deferSystemGesturesMode: 0
+  hideHomeButton: 0
+  submitAnalytics: 1
+  usePlayerLog: 1
+  bakeCollisionMeshes: 0
+  forceSingleInstance: 0
+  useFlipModelSwapchain: 1
+  resizableWindow: 0
+  useMacAppStoreValidation: 0
+  macAppStoreCategory: public.app-category.games
+  gpuSkinning: 0
+  xboxPIXTextureCapture: 0
+  xboxEnableAvatar: 0
+  xboxEnableKinect: 0
+  xboxEnableKinectAutoTracking: 0
+  xboxEnableFitness: 0
+  visibleInBackground: 1
+  allowFullscreenSwitch: 1
+  fullscreenMode: 1
+  xboxEnableSpeech: 0
+  xboxAdaptivePerformance: 0
+  xboxAdaptivePerformanceAutoScaling: 0
+  uiUse16BitDepthBuffer: 0
+  iPhoneBundleIdentifier: com.naullama.puzzle2048
+  iPhoneBuildNumber: 0
+  iPhoneAppleEnableAutomaticSigning: 0
+  iPhoneAppleDeveloperTeamID:
+  appleEnableAutomaticSigning: 0
+  appleDeveloperTeamID:
+  iOSManualProvisioningProfileID:
+  iOSManualProvisioningProfileType: 0
+  tvOSManualProvisioningProfileID:
+  tvOSManualProvisioningProfileType: 0
+  AndroidTargetArchitectures: 1
+  AndroidTargetDevices: 0
+  AndroidSplashScreenScale: 0
+  androidSplashScreen: {fileID: 0}
+  AndroidKeystoreName:
+  AndroidKeyaliasName:
+  AndroidBuildApkPerCpuArchitecture: 0
+  AndroidTVCompatibility: 0
+  AndroidIsGame: 1
+  AndroidEnableTango: 0
+  androidEnableBanner: 1
+  androidUseLowLatencyAudioIfPossible: 0
+  androidRenderingAPI: 0
+  m_BuildTargetIcons: []
+  m_BuildTargetPlatformIcons: []
+  m_BuildTargetBatching: []
+  m_BuildTargetGraphicsJobs: []
+  m_BuildTargetGraphicsJobMode: []
+  m_BuildTargetGraphicsAPIs:
+  - m_BuildTarget: WebGL
+    m_APIs: 1100000015000000
+    m_Automatic: 0
+  m_BuildTargetVRSettings: []
+  openGLRequireES31: 0
+  openGLRequireES31AEP: 0
+  openGLRequireES32: 0
+  m_TemplateCustomTags: {}
+  mobileMTRendering:
+    Android: 1
+    iPhone: 1
+    tvOS: 1
+  m_BuildTargetGroupLightmapEncodingQuality: []
+  m_BuildTargetGroupHDRCubemapEncodingQuality: []
+  m_BuildTargetGroupLoadingScreenQuality: []
+  playModeTestRunnerEnabled: 0
+  actionOnDotNetUnhandledException: 1
+  enableInternalProfiler: 0
+  logObjCUncaughtExceptions: 1
+  enableCrashReportAPI: 0
+  cameraUsageDescription:
+  locationUsageDescription:
+  microphoneUsageDescription:
+  bluetoothUsageDescription:
+  networkingPackageName:
+  backgroundModes: 0
+  iosBuildNumber: 0
+  tvOSBuildNumber: 0
+  switchNetworkInterfaceManagerInitializeOnStartup: 1
+  productName: puzzle-2048
+  bundleVersion: 1.0
+  preloadedAssets: []
+  stripEngineCode: 1
+  iPhoneScriptCallOptimization: 0
+  foceExcludeEditorFromDLL: 0
+  managedStrippingLevel:
+    Standalone: 1
+    Server: 1
+  additionalIl2CppArgs:
+  scriptingBackend:
+    WebGL: 1
+  il2cppCompilerConfiguration:
+    WebGL: 1
+  managedStrippingLevel:
+    WebGL: 1
+  il2cppCodeGeneration:
+    WebGL: 0
+  platformArchitecture: {}
+  scriptingDefineSymbols: {}
+  additionalCompilerArguments: {}
+  platformLibraryVersions: {}
+  additionalAotProfiles: {}
+  iOSTargetOSVersionString: 13.0
+  tvOSTargetOSVersionString: 13.0
+  tizenProductDescription:
+  tizenProductURL:
+  iOSURLSchemes: []
+  macOSURLSchemes: []
+  unityAnalyticsEnabled: 0
+  unityAnalyticsTestMode: 0
+  uriSchemes: []
+  cloudProjectId:
+  framebufferDepthMemorylessMode: 0
+  qualitySettingsNames: []
+  projectName:
+  organizationId:
+  cloudEnabled: 0
+  legacyClampBlendShapeWeights: 0
+  playerDataPath:
+  forceSRGBBlit: 0
+  virtualTexturingSupportEnabled: 0
