@@ -2,61 +2,49 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
-using TMPro;
 
-/// <summary>
-/// シーン設定なしで2048ゲーム全体をコードから構築するブートストラップ。
-/// RuntimeInitializeOnLoadMethod によりシーンのワイヤリング不要で動作する。
-/// </summary>
 public class GameBootstrap : MonoBehaviour
 {
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     static void Boot()
     {
+        if (FindObjectOfType<GameBootstrap>() != null) return;
         var go = new GameObject("GameBootstrap");
         DontDestroyOnLoad(go);
         go.AddComponent<GameBootstrap>();
     }
 
-    // ---- 定数 ----
     const int SIZE = 4;
-    const int WIN = 2048;
-    const float CELL = 110f;
-    const float GAP = 12f;
+    const int WIN  = 2048;
+    const float CELL = 100f;
+    const float GAP  = 10f;
 
-    // ---- 状態 ----
-    int[,] board = new int[SIZE, SIZE];
-    int score = 0;
-    int best = 0;
+    int[,]  board = new int[SIZE, SIZE];
+    int     score, best;
+    bool    gameEnded, won;
 
-    // ---- UI ----
-    TextMeshProUGUI scoreLabel, bestLabel;
-    RectTransform[] cellRects = new RectTransform[SIZE * SIZE];
-    Image[] cellBg = new Image[SIZE * SIZE];
-    TextMeshProUGUI[] cellText = new TextMeshProUGUI[SIZE * SIZE];
-    GameObject gameOverPanel, winPanel;
-    bool gameEnded = false;
-    bool won = false;
+    Text        scoreValueText, bestValueText;
+    Image[]     cellImg  = new Image[SIZE * SIZE];
+    Text[]      cellText = new Text[SIZE * SIZE];
+    GameObject  gameOverPanel, winPanel;
 
-    static readonly Color COL_BG = new Color(0.74f, 0.68f, 0.63f);
-    static readonly Color COL_EMPTY = new Color(0.80f, 0.75f, 0.70f);
-    static readonly Color[] TILE_COLS = {
-        new Color(0.93f,0.89f,0.85f), // 2
-        new Color(0.93f,0.88f,0.78f), // 4
-        new Color(0.95f,0.69f,0.47f), // 8
-        new Color(0.96f,0.58f,0.39f), // 16
-        new Color(0.96f,0.49f,0.37f), // 32
-        new Color(0.96f,0.37f,0.23f), // 64
-        new Color(0.93f,0.81f,0.45f), // 128
-        new Color(0.93f,0.80f,0.38f), // 256
-        new Color(0.93f,0.78f,0.31f), // 512
-        new Color(0.93f,0.77f,0.25f), // 1024
-        new Color(0.93f,0.76f,0.18f), // 2048+
+    static readonly Color BG_BOARD  = Hex("bbada0");
+    static readonly Color BG_EMPTY  = Hex("cdc1b4");
+    static readonly Color BG_SCREEN = Hex("faf8ef");
+
+    static readonly Color[] TILE_BG = {
+        Hex("eee4da"), Hex("ede0c8"), Hex("f2b179"), Hex("f59563"),
+        Hex("f67c5f"), Hex("f65e3b"), Hex("edcf72"), Hex("edcc61"),
+        Hex("edc850"), Hex("edc53f"), Hex("edc22e"),
     };
+    static readonly Color DARK_TEXT = Hex("776e65");
+    static readonly Color LITE_TEXT = Hex("f9f6f2");
+
+    // ── ライフサイクル ──────────────────────────────────
 
     void Awake()
     {
-        best = PlayerPrefs.GetInt("Best", 0);
+        best = PlayerPrefs.GetInt("Best2048", 0);
         BuildUI();
         NewGame();
     }
@@ -65,76 +53,96 @@ public class GameBootstrap : MonoBehaviour
     {
         if (gameEnded) return;
         Vector2Int dir = Vector2Int.zero;
-        if (Input.GetKeyDown(KeyCode.UpArrow))    dir = Vector2Int.up;
-        if (Input.GetKeyDown(KeyCode.DownArrow))  dir = Vector2Int.down;
-        if (Input.GetKeyDown(KeyCode.LeftArrow))  dir = Vector2Int.left;
-        if (Input.GetKeyDown(KeyCode.RightArrow)) dir = Vector2Int.right;
+        if (Input.GetKeyDown(KeyCode.UpArrow))    dir = new Vector2Int( 0,  1);
+        if (Input.GetKeyDown(KeyCode.DownArrow))  dir = new Vector2Int( 0, -1);
+        if (Input.GetKeyDown(KeyCode.LeftArrow))  dir = new Vector2Int(-1,  0);
+        if (Input.GetKeyDown(KeyCode.RightArrow)) dir = new Vector2Int( 1,  0);
         if (dir == Vector2Int.zero) return;
-        if (TryMove(dir)) AfterMove();
+        if (DoMove(dir)) AfterMove();
     }
 
-    // ======== ゲームロジック ========
+    // ── ゲームロジック ────────────────────────────────
 
     void NewGame()
     {
-        score = 0;
-        gameEnded = false;
-        won = false;
-        board = new int[SIZE, SIZE];
-        SpawnRandom(); SpawnRandom();
-        RefreshBoard();
-        UpdateScore();
-        if (gameOverPanel) gameOverPanel.SetActive(false);
-        if (winPanel) winPanel.SetActive(false);
-    }
-
-    void SpawnRandom()
-    {
-        var empties = new List<(int r, int c)>();
+        score = 0; gameEnded = false; won = false;
         for (int r = 0; r < SIZE; r++)
             for (int c = 0; c < SIZE; c++)
-                if (board[r, c] == 0) empties.Add((r, c));
-        if (empties.Count == 0) return;
-        var (row, col) = empties[Random.Range(0, empties.Count)];
-        board[row, col] = Random.value < 0.9f ? 2 : 4;
+                board[r, c] = 0;
+        Spawn(); Spawn();
+        Redraw();
+        if (gameOverPanel) gameOverPanel.SetActive(false);
+        if (winPanel)      winPanel.SetActive(false);
     }
 
-    bool TryMove(Vector2Int dir)
+    void Spawn()
+    {
+        var empty = new List<int>();
+        for (int i = 0; i < SIZE * SIZE; i++)
+            if (board[i / SIZE, i % SIZE] == 0) empty.Add(i);
+        if (empty.Count == 0) return;
+        int idx = empty[Random.Range(0, empty.Count)];
+        board[idx / SIZE, idx % SIZE] = Random.value < 0.9f ? 2 : 4;
+    }
+
+    // 戻り値: タイルが動いたか
+    bool DoMove(Vector2Int dir)
     {
         bool moved = false;
+
+        // 走査順: 移動方向の先端から処理
+        int[] rows = TraversalOrder(dir.y == 0 ? 0 : (dir.y > 0 ? 1 : -1), SIZE);
+        int[] cols = TraversalOrder(dir.x == 0 ? 0 : (dir.x > 0 ? 1 : -1), SIZE);
+
         bool[,] merged = new bool[SIZE, SIZE];
-        int dr = -dir.y, dc = dir.x;
 
-        int rStart = dr > 0 ? SIZE - 1 : 0, rEnd = dr > 0 ? -1 : SIZE, rStep = dr > 0 ? -1 : 1;
-        int cStart = dc > 0 ? SIZE - 1 : 0, cEnd = dc > 0 ? -1 : SIZE, cStep = dc > 0 ? -1 : 1;
-
-        for (int r = rStart; r != rEnd; r += rStep)
-        for (int c = cStart; c != cEnd; c += cStep)
+        foreach (int r in rows)
+        foreach (int c in cols)
         {
             if (board[r, c] == 0) continue;
-            int nr = r + dr, nc = c + dc;
-            while (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE)
+
+            int tr = r, tc = c;
+            // 移動先を探す
+            while (true)
             {
-                if (board[nr, nc] != 0)
+                int nr = tr + dir.y;   // ←ここは dir.y を行方向に使う
+                int nc = tc + dir.x;
+                if (nr < 0 || nr >= SIZE || nc < 0 || nc >= SIZE) break;
+                if (board[nr, nc] == 0) { tr = nr; tc = nc; }
+                else if (board[nr, nc] == board[r, c] && !merged[nr, nc])
                 {
-                    if (board[nr, nc] == board[nr - dr, nc - dc] && !merged[nr, nc])
-                    {
-                        int val = board[nr, nc] * 2;
-                        board[nr, nc] = val;
-                        board[nr - dr, nc - dc] = 0;
-                        merged[nr, nc] = true;
-                        score += val;
-                        moved = true;
-                    }
+                    tr = nr; tc = nc;
                     break;
                 }
-                board[nr, nc] = board[nr - dr, nc - dc];
-                board[nr - dr, nc - dc] = 0;
-                moved = true;
-                nr += dr; nc += dc;
+                else break;
             }
+
+            if (tr == r && tc == c) continue;
+
+            if (board[tr, tc] == board[r, c] && !merged[tr, tc])
+            {
+                int val = board[r, c] * 2;
+                board[tr, tc] = val;
+                board[r,  c]  = 0;
+                merged[tr, tc] = true;
+                score += val;
+            }
+            else
+            {
+                board[tr, tc] = board[r, c];
+                board[r,  c]  = 0;
+            }
+            moved = true;
         }
         return moved;
+    }
+
+    int[] TraversalOrder(int direction, int size)
+    {
+        int[] arr = new int[size];
+        for (int i = 0; i < size; i++) arr[i] = i;
+        if (direction > 0) System.Array.Reverse(arr);
+        return arr;
     }
 
     void AfterMove()
@@ -144,230 +152,259 @@ public class GameBootstrap : MonoBehaviour
             won = true;
             if (winPanel) winPanel.SetActive(true);
         }
-        SpawnRandom();
-        RefreshBoard();
-        if (score > best) { best = score; PlayerPrefs.SetInt("Best", best); }
-        UpdateScore();
+        Spawn();
+        Redraw();
+        if (score > best) { best = score; PlayerPrefs.SetInt("Best2048", best); }
+        SetScoreText();
         if (!CanMove()) { gameEnded = true; if (gameOverPanel) gameOverPanel.SetActive(true); }
     }
 
-    bool HasValue(int v) { for (int r = 0; r < SIZE; r++) for (int c = 0; c < SIZE; c++) if (board[r, c] == v) return true; return false; }
+    bool HasValue(int v)
+    {
+        for (int r = 0; r < SIZE; r++)
+            for (int c = 0; c < SIZE; c++)
+                if (board[r, c] == v) return true;
+        return false;
+    }
 
     bool CanMove()
     {
-        for (int r = 0; r < SIZE; r++) for (int c = 0; c < SIZE; c++)
+        for (int r = 0; r < SIZE; r++)
+        for (int c = 0; c < SIZE; c++)
         {
             if (board[r, c] == 0) return true;
-            if (r + 1 < SIZE && board[r, c] == board[r + 1, c]) return true;
-            if (c + 1 < SIZE && board[r, c] == board[r, c + 1]) return true;
+            if (r+1 < SIZE && board[r,c] == board[r+1,c]) return true;
+            if (c+1 < SIZE && board[r,c] == board[r,c+1]) return true;
         }
         return false;
     }
 
-    // ======== UI 構築 ========
+    // ── 表示更新 ──────────────────────────────────────
 
-    void BuildUI()
-    {
-        // Canvas
-        var canvasGO = new GameObject("Canvas");
-        var canvas = canvasGO.AddComponent<Canvas>();
-        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        canvasGO.AddComponent<CanvasScaler>().uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        ((CanvasScaler)canvasGO.GetComponent<CanvasScaler>()).referenceResolution = new Vector2(600, 800);
-        canvasGO.AddComponent<GraphicRaycaster>();
-
-        // 背景
-        var bg = MakeImage(canvasGO.transform, "BG", new Color(0.97f, 0.96f, 0.94f));
-        bg.anchorMin = Vector2.zero; bg.anchorMax = Vector2.one;
-        bg.offsetMin = bg.offsetMax = Vector2.zero;
-
-        // ヘッダー
-        var header = MakePanel(canvasGO.transform, "Header", new Vector2(560, 80), new Vector2(0, 360));
-        MakeLabel(header, "Title", "2048", 48, new Vector2(-150, 0), new Color(0.47f, 0.43f, 0.40f));
-        var scoreBox = MakeScoreBox(header, "SCORE", new Vector2(60, 0));
-        scoreLabel = scoreBox.GetComponentInChildren<TextMeshProUGUI>();
-        var bestBox = MakeScoreBox(header, "BEST", new Vector2(150, 0));
-        bestLabel = bestBox.GetComponentInChildren<TextMeshProUGUI>();
-
-        // New Game ボタン
-        var btnRT = MakePanel(canvasGO.transform, "NewBtn", new Vector2(140, 44), new Vector2(0, 305));
-        var btnImg = btnRT.GetComponent<Image>() ?? btnRT.gameObject.AddComponent<Image>();
-        btnImg.color = new Color(0.74f, 0.68f, 0.63f);
-        AddRoundedButton(btnRT.gameObject, NewGame);
-        MakeLabel(btnRT, "BtnLabel", "New Game", 18, Vector2.zero, Color.white);
-
-        // グリッド背景
-        float boardSize = SIZE * CELL + (SIZE + 1) * GAP;
-        var gridBG = MakeImage(canvasGO.transform, "GridBG", COL_BG);
-        gridBG.sizeDelta = new Vector2(boardSize, boardSize);
-        gridBG.anchoredPosition = new Vector2(0, -20);
-
-        // セル生成
-        for (int r = 0; r < SIZE; r++)
-        for (int c = 0; c < SIZE; c++)
-        {
-            int idx = r * SIZE + c;
-            float x = GAP + c * (CELL + GAP) + CELL * 0.5f - boardSize * 0.5f;
-            float y = GAP + r * (CELL + GAP) + CELL * 0.5f - boardSize * 0.5f;
-
-            // 空セル背景
-            var emptyCell = MakeImage(gridBG, "Cell_" + idx, COL_EMPTY);
-            emptyCell.sizeDelta = new Vector2(CELL, CELL);
-            emptyCell.anchoredPosition = new Vector2(x, y);
-
-            // タイル
-            var tileRT = MakeImage(gridBG, "Tile_" + idx, COL_EMPTY);
-            tileRT.sizeDelta = new Vector2(CELL, CELL);
-            tileRT.anchoredPosition = new Vector2(x, y);
-            cellRects[idx] = tileRT;
-            cellBg[idx] = tileRT.GetComponent<Image>();
-            var lbl = MakeLabel(tileRT, "Num", "", 32, Vector2.zero, new Color(0.47f, 0.43f, 0.40f));
-            cellText[idx] = lbl;
-        }
-
-        // ゲームオーバーパネル
-        gameOverPanel = BuildOverlayPanel(canvasGO.transform, "GAME OVER", "もう動けません", "もう一度", gridBG, new Color(0.97f, 0.96f, 0.94f, 0.85f));
-        gameOverPanel.SetActive(false);
-
-        // クリアパネル
-        winPanel = BuildOverlayPanel(canvasGO.transform, "YOU WIN!", "2048 達成！", "続ける", gridBG, new Color(0.93f, 0.81f, 0.45f, 0.85f));
-        winPanel.SetActive(false);
-    }
-
-    // ---- ヘルパー ----
-
-    RectTransform MakeImage(Transform parent, string name, Color color)
-    {
-        var go = new GameObject(name);
-        go.transform.SetParent(parent, false);
-        var img = go.AddComponent<Image>();
-        img.color = color;
-        var rt = go.GetComponent<RectTransform>();
-        rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
-        rt.pivot = new Vector2(0.5f, 0.5f);
-        return rt;
-    }
-
-    RectTransform MakePanel(Transform parent, string name, Vector2 size, Vector2 pos)
-    {
-        var rt = MakeImage(parent, name, Color.clear);
-        rt.sizeDelta = size;
-        rt.anchoredPosition = pos;
-        return rt;
-    }
-
-    TextMeshProUGUI MakeLabel(RectTransform parent, string name, string text, int size, Vector2 pos, Color color)
-    {
-        var go = new GameObject(name);
-        go.transform.SetParent(parent, false);
-        var tmp = go.AddComponent<TextMeshProUGUI>();
-        tmp.text = text;
-        tmp.fontSize = size;
-        tmp.color = color;
-        tmp.alignment = TextAlignmentOptions.Center;
-        tmp.fontStyle = FontStyles.Bold;
-        var rt = go.GetComponent<RectTransform>();
-        rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one;
-        rt.offsetMin = rt.offsetMax = Vector2.zero;
-        rt.anchoredPosition = pos;
-        return tmp;
-    }
-
-    RectTransform MakeScoreBox(RectTransform parent, string label, Vector2 pos)
-    {
-        var box = MakeImage(parent, label + "Box", new Color(0.74f, 0.68f, 0.63f));
-        box.sizeDelta = new Vector2(80, 50);
-        box.anchoredPosition = pos;
-        MakeLabel(box, "Label", label, 12, new Vector2(0, 10), new Color(0.87f, 0.84f, 0.81f));
-        MakeLabel(box, "Value", "0", 18, new Vector2(0, -8), Color.white);
-        return box;
-    }
-
-    GameObject BuildOverlayPanel(Transform parent, string title, string sub, string btnLabel, RectTransform anchor, Color bgColor)
-    {
-        var panel = new GameObject(title + "Panel");
-        panel.transform.SetParent(parent, false);
-        var rt = panel.AddComponent<RectTransform>();
-        rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 0.5f);
-        rt.sizeDelta = anchor.sizeDelta;
-        rt.anchoredPosition = anchor.anchoredPosition;
-        var img = panel.AddComponent<Image>();
-        img.color = bgColor;
-
-        MakeLabel(rt, "Title", title, 42, new Vector2(0, 60), new Color(0.47f, 0.43f, 0.40f));
-        MakeLabel(rt, "Sub", sub, 20, new Vector2(0, 10), new Color(0.47f, 0.43f, 0.40f));
-
-        var btn = MakeImage(rt, "Btn", new Color(0.74f, 0.68f, 0.63f));
-        btn.sizeDelta = new Vector2(150, 44);
-        btn.anchoredPosition = new Vector2(0, -50);
-        AddRoundedButton(btn.gameObject, () => { panel.SetActive(false); if (title == "GAME OVER" || title == "YOU WIN!") NewGame(); });
-        MakeLabel(btn, "BtnLabel", btnLabel, 18, Vector2.zero, Color.white);
-
-        return panel;
-    }
-
-    void AddRoundedButton(GameObject go, UnityEngine.Events.UnityAction action)
-    {
-        var btn = go.AddComponent<Button>();
-        var colors = btn.colors;
-        colors.highlightedColor = new Color(0.85f, 0.79f, 0.73f);
-        colors.pressedColor = new Color(0.65f, 0.60f, 0.56f);
-        btn.colors = colors;
-        btn.onClick.AddListener(action);
-    }
-
-    // ======== 表示更新 ========
-
-    void RefreshBoard()
+    void Redraw()
     {
         for (int r = 0; r < SIZE; r++)
         for (int c = 0; c < SIZE; c++)
         {
             int idx = r * SIZE + c;
-            int v = board[r, c];
-            cellBg[idx].color = v == 0 ? COL_EMPTY : TileColor(v);
-            cellText[idx].text = v == 0 ? "" : v.ToString();
-            cellText[idx].color = v <= 4 ? new Color(0.47f, 0.43f, 0.40f) : Color.white;
-            cellText[idx].fontSize = v >= 1000 ? 24 : v >= 100 ? 28 : 32;
-            if (v != 0) StartCoroutine(PopAnim(cellRects[idx]));
+            int v   = board[r, c];
+            cellImg[idx].color  = v == 0 ? BG_EMPTY : TileColor(v);
+            cellText[idx].text  = v == 0 ? "" : v.ToString();
+            cellText[idx].color = v <= 4 ? DARK_TEXT : LITE_TEXT;
+            cellText[idx].fontSize = v >= 1000 ? 22 : v >= 100 ? 26 : 32;
         }
+        SetScoreText();
+    }
+
+    void SetScoreText()
+    {
+        if (scoreValueText) scoreValueText.text = score.ToString();
+        if (bestValueText)  bestValueText.text  = best.ToString();
     }
 
     Color TileColor(int v)
     {
-        int idx = Mathf.Clamp((int)Mathf.Log(v, 2) - 1, 0, TILE_COLS.Length - 1);
-        return TILE_COLS[idx];
+        int i = Mathf.Clamp((int)Mathf.Log(v, 2) - 1, 0, TILE_BG.Length - 1);
+        return TILE_BG[i];
     }
 
-    void UpdateScore()
-    {
-        if (scoreLabel) scoreLabel.text = score.ToString();
-        if (bestLabel) bestLabel.text = best.ToString();
-        // スコアボックスの Value ラベルを更新
-        UpdateScoreBox("SCOREBox", score);
-        UpdateScoreBox("BESTBox", best);
-    }
+    // ── UI 構築 ────────────────────────────────────────
 
-    void UpdateScoreBox(string boxName, int val)
+    void BuildUI()
     {
-        var box = GameObject.Find(boxName);
-        if (box == null) return;
-        var labels = box.GetComponentsInChildren<TextMeshProUGUI>();
-        foreach (var l in labels)
-            if (l.gameObject.name == "Value") l.text = val.ToString();
-    }
+        // Canvas
+        var cvGO = new GameObject("Canvas");
+        var cv   = cvGO.AddComponent<Canvas>();
+        cv.renderMode = RenderMode.ScreenSpaceOverlay;
+        var cs = cvGO.AddComponent<CanvasScaler>();
+        cs.uiScaleMode         = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        cs.referenceResolution = new Vector2(500, 700);
+        cs.screenMatchMode     = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
+        cs.matchWidthOrHeight  = 0.5f;
+        cvGO.AddComponent<GraphicRaycaster>();
 
-    IEnumerator PopAnim(RectTransform rt)
-    {
-        rt.localScale = Vector3.one * 0.8f;
-        float t = 0;
-        while (t < 1)
+        var root = cvGO.GetComponent<RectTransform>();
+
+        // 画面背景
         {
-            t += Time.deltaTime / 0.12f;
-            float s = Mathf.Lerp(0.8f, 1f, t < 0.7f ? t / 0.7f * 1.1f : 1f + (1f - t) / 0.3f * 0.1f);
-            rt.localScale = Vector3.one * s;
-            yield return null;
+            var bg = NewImg(root, "BG", BG_SCREEN);
+            Stretch(bg);
         }
-        rt.localScale = Vector3.one;
+
+        // タイトル
+        var titleT = NewText(root, "Title", "2048", 52, DARK_TEXT, FontStyle.Bold);
+        Place(titleT, new Vector2(0, 0.88f), new Vector2(0, 0.88f), new Vector2(-100, 0), new Vector2(200, 60));
+
+        // スコアボックス
+        scoreValueText = BuildScoreBox(root, "SCORE",  new Vector2(0.75f, 0.88f));
+        bestValueText  = BuildScoreBox(root, "BEST",   new Vector2(0.88f, 0.88f));
+
+        // New Game ボタン
+        {
+            var btn = NewImg(root, "NewGameBtn", Hex("8f7a66"));
+            Place(btn, new Vector2(0.5f, 0.82f), new Vector2(0.5f, 0.82f), Vector2.zero, new Vector2(140, 36));
+            var t = NewText(btn, "L", "New Game", 16, LITE_TEXT, FontStyle.Bold);
+            Stretch(t); CenterText(t.GetComponent<Text>());
+            AddBtn(btn.gameObject, NewGame);
+        }
+
+        // ガイド
+        {
+            var guide = NewText(root, "Guide", "← → ↑ ↓ キーで操作", 14, Hex("bbada0"), FontStyle.Normal);
+            Place(guide, new Vector2(0.5f, 0.78f), new Vector2(0.5f, 0.78f), Vector2.zero, new Vector2(300, 24));
+            CenterText(guide.GetComponent<Text>());
+        }
+
+        // グリッド背景
+        float board_px = SIZE * CELL + (SIZE + 1) * GAP;
+        var gridBG = NewImg(root, "Grid", BG_BOARD);
+        Place(gridBG, new Vector2(0.5f, 0.42f), new Vector2(0.5f, 0.42f),
+              Vector2.zero, new Vector2(board_px, board_px));
+        var gridRT = gridBG;
+
+        // 空セル＋タイル
+        for (int r = 0; r < SIZE; r++)
+        for (int c = 0; c < SIZE; c++)
+        {
+            int idx = r * SIZE + c;
+            float x = GAP + c * (CELL + GAP) + CELL * 0.5f - board_px * 0.5f;
+            float y = GAP + r * (CELL + GAP) + CELL * 0.5f - board_px * 0.5f;
+            var pos = new Vector2(x, y);
+
+            // 空セル背景
+            var emptyRT = NewImg(gridRT, "E" + idx, BG_EMPTY);
+            Place(emptyRT, new Vector2(0.5f,0.5f), new Vector2(0.5f,0.5f), pos, new Vector2(CELL, CELL));
+
+            // タイル
+            var tileRT = NewImg(gridRT, "T" + idx, BG_EMPTY);
+            Place(tileRT, new Vector2(0.5f,0.5f), new Vector2(0.5f,0.5f), pos, new Vector2(CELL, CELL));
+            cellImg[idx] = tileRT.GetComponent<Image>();
+
+            var numText = NewText(tileRT, "N", "", 32, DARK_TEXT, FontStyle.Bold);
+            Stretch(numText); CenterText(numText.GetComponent<Text>());
+            cellText[idx] = numText.GetComponent<Text>();
+        }
+
+        // ゲームオーバーパネル
+        gameOverPanel = BuildOverlay(root, "GAME OVER",
+            "これ以上動けません", "もう一度", () => NewGame(), Hex("eee4daCC"));
+
+        // クリアパネル
+        winPanel = BuildOverlay(root, "YOU WIN!",
+            "2048 達成！おめでとう！", "続ける", () => { winPanel.SetActive(false); }, Hex("edcf72CC"));
+    }
+
+    // ── UI ヘルパー ────────────────────────────────────
+
+    RectTransform NewImg(RectTransform parent, string name, Color color)
+    {
+        var go  = new GameObject(name);
+        go.transform.SetParent(parent, false);
+        go.AddComponent<Image>().color = color;
+        return go.GetComponent<RectTransform>();
+    }
+
+    RectTransform NewText(RectTransform parent, string name, string txt, int size, Color color, FontStyle style)
+    {
+        var go = new GameObject(name);
+        go.transform.SetParent(parent, false);
+        var t = go.AddComponent<Text>();
+        t.text      = txt;
+        t.fontSize  = size;
+        t.color     = color;
+        t.fontStyle = style;
+        t.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        t.alignment = TextAnchor.MiddleCenter;
+        return go.GetComponent<RectTransform>();
+    }
+
+    void Stretch(RectTransform rt)
+    {
+        rt.anchorMin  = Vector2.zero;
+        rt.anchorMax  = Vector2.one;
+        rt.offsetMin  = Vector2.zero;
+        rt.offsetMax  = Vector2.zero;
+    }
+
+    void Place(RectTransform rt, Vector2 anchorMin, Vector2 anchorMax, Vector2 pos, Vector2 size)
+    {
+        rt.anchorMin       = anchorMin;
+        rt.anchorMax       = anchorMax;
+        rt.anchoredPosition = pos;
+        rt.sizeDelta       = size;
+    }
+
+    void CenterText(Text t)
+    {
+        t.alignment = TextAnchor.MiddleCenter;
+    }
+
+    void AddBtn(GameObject go, UnityEngine.Events.UnityAction action)
+    {
+        var btn = go.GetComponent<Button>() ?? go.AddComponent<Button>();
+        var nav = btn.navigation;
+        nav.mode       = Navigation.Mode.None;
+        btn.navigation = nav;
+        btn.onClick.AddListener(action);
+    }
+
+    Text BuildScoreBox(RectTransform root, string label, Vector2 anchor)
+    {
+        var box = NewImg(root, label + "Box", Hex("bbada0"));
+        Place(box, anchor, anchor, Vector2.zero, new Vector2(70, 46));
+
+        var lbl = NewText(box, "L", label, 11, LITE_TEXT, FontStyle.Bold);
+        Place(lbl, new Vector2(0,0.55f), new Vector2(1,1), Vector2.zero, Vector2.zero);
+        CenterText(lbl.GetComponent<Text>());
+
+        var val = NewText(box, "V", "0", 18, LITE_TEXT, FontStyle.Bold);
+        Place(val, new Vector2(0,0), new Vector2(1,0.6f), Vector2.zero, Vector2.zero);
+        CenterText(val.GetComponent<Text>());
+
+        return val.GetComponent<Text>();
+    }
+
+    GameObject BuildOverlay(RectTransform root, string title, string sub,
+                            string btnLabel, UnityEngine.Events.UnityAction onBtn, Color bgColor)
+    {
+        var panel = NewImg(root, title + "Panel", bgColor);
+        Place(panel, new Vector2(0.1f, 0.25f), new Vector2(0.9f, 0.65f), Vector2.zero, Vector2.zero);
+        panel.anchorMin = new Vector2(0.1f, 0.25f);
+        panel.anchorMax = new Vector2(0.9f, 0.65f);
+        panel.offsetMin = Vector2.zero;
+        panel.offsetMax = Vector2.zero;
+
+        var titleT = NewText(panel, "T", title, 38, DARK_TEXT, FontStyle.Bold);
+        Place(titleT, new Vector2(0,0.6f), new Vector2(1,0.95f), Vector2.zero, Vector2.zero);
+        CenterText(titleT.GetComponent<Text>());
+
+        var subT = NewText(panel, "S", sub, 16, DARK_TEXT, FontStyle.Normal);
+        Place(subT, new Vector2(0,0.38f), new Vector2(1,0.62f), Vector2.zero, Vector2.zero);
+        CenterText(subT.GetComponent<Text>());
+
+        var btn = NewImg(panel, "Btn", Hex("8f7a66"));
+        Place(btn, new Vector2(0.25f,0.05f), new Vector2(0.75f,0.3f), Vector2.zero, Vector2.zero);
+        btn.anchorMin = new Vector2(0.25f, 0.05f);
+        btn.anchorMax = new Vector2(0.75f, 0.3f);
+        btn.offsetMin = Vector2.zero;
+        btn.offsetMax = Vector2.zero;
+
+        var btnT = NewText(btn, "L", btnLabel, 16, LITE_TEXT, FontStyle.Bold);
+        Stretch(btnT); CenterText(btnT.GetComponent<Text>());
+        AddBtn(btn.gameObject, onBtn);
+
+        return panel.gameObject;
+    }
+
+    // ── ユーティリティ ────────────────────────────────
+
+    static Color Hex(string hex)
+    {
+        hex = hex.TrimStart('#');
+        byte r = System.Convert.ToByte(hex.Substring(0, 2), 16);
+        byte g = System.Convert.ToByte(hex.Substring(2, 2), 16);
+        byte b = System.Convert.ToByte(hex.Substring(4, 2), 16);
+        byte a = hex.Length >= 8 ? System.Convert.ToByte(hex.Substring(6, 2), 16) : (byte)255;
+        return new Color32(r, g, b, a);
     }
 }

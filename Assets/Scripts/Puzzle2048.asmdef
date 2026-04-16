@@ -1,9 +1,7 @@
 {
     "name": "Puzzle2048",
     "rootNamespace": "Puzzle2048",
-    "references": [
-        "Unity.TextMeshPro"
-    ],
+    "references": [],
     "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
