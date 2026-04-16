@@ -1,118 +1,53 @@
-name: Build and Deploy to GitHub Pages
+name: Build WebGL
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
   workflow_dispatch:
-
-permissions:
-  contents: write
-  pages: write
-  id-token: write
 
 jobs:
   build:
-    name: Build Unity WebGL
     runs-on: ubuntu-latest
+    
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          lfs: true
-
-      - name: Cache Unity Library
-        uses: actions/cache@v4
-        with:
-          path: Library
-          key: Library-WebGL-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
-          restore-keys: |
-            Library-WebGL-
-            Library-
-
-      - name: Build Unity WebGL
-        uses: game-ci/unity-builder@v4
-        env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-        with:
-          targetPlatform: WebGL
-          buildName: puzzle-2048
-          buildsPath: docs
-          unityVersion: 6000.0.23f1
-
-      - name: Copy index.html to docs root
-        run: |
-          if [ -f docs/WebGL/puzzle-2048/index.html ]; then
-            cp docs/WebGL/puzzle-2048/index.html docs/index.html
-          fi
-
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: webgl-build
-          path: docs/
-          retention-days: 7
-
-      - name: Commit and push build output
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/
-          git diff --staged --quiet || git commit -m "ci: WebGL build output [skip ci]"
-          git push
-
-  deploy:
-    name: Deploy to GitHub Pages
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          ref: main
-
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-
-      - name: Upload pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: docs/
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
-
-  release:
-    name: Create GitHub Release
-    needs: deploy
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Create Release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: v1.0.0
-          name: "puzzle-2048 v1.0.0"
-          body: |
-            ## 2048 Puzzle Game - Initial Release
-
-            Play at: https://naullama.github.io/puzzle-2048/
-
-            ### How to Play
-            - Use arrow keys (↑↓←→) to move tiles
-            - Tiles with the same number merge when they touch
-            - Reach **2048** to win!
-          draft: false
-          prerelease: false
-          fail_on_unmatched_files: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - uses: actions/checkout@v4
+      with:
+        lfs: true
+        
+    - uses: actions/cache@v4
+      with:
+        path: Library
+        key: Library-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+        restore-keys: |
+          Library-
+          
+    - uses: game-ci/unity-builder@v4
+      env:
+        UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+        UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+        UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+      with:
+        targetPlatform: WebGL
+        allowDirtyBuild: true
+        
+    - uses: actions/upload-artifact@v4
+      with:
+        name: build-WebGL
+        path: build/WebGL/WebGL
+        
+    - name: Deploy to GitHub Pages
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./build/WebGL/WebGL
+        
+    - name: Create Release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v1.0.0
+        release_name: Release v1.0.0
+        body: 2048 Clone - WebGL Build
+        draft: false
+        prerelease: false
