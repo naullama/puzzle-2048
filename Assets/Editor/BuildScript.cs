@@ -17,7 +17,7 @@ public class BuildScript
         BuildPlayerOptions opt = new BuildPlayerOptions
         {
             scenes = scenes,
-            locationPathName = "docs/Build",
+            locationPathName = "docs",
             target = BuildTarget.WebGL,
             options = BuildOptions.None
         };
