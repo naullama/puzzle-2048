@@ -313,7 +313,9 @@ public class GameBootstrap : MonoBehaviour
         t.fontSize  = size;
         t.color     = color;
         t.fontStyle = style;
-        t.font      = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        var font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf")
+                ?? Resources.GetBuiltinResource<Font>("Arial.ttf");
+        if (font != null) t.font = font;
         t.alignment = TextAnchor.MiddleCenter;
         return go.GetComponent<RectTransform>();
     }
