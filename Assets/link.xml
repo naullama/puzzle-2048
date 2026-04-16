@@ -1,4 +1,8 @@
 <linker>
+  <!-- asmdef削除によりすべてのゲームスクリプトはAssembly-CSharpに入る -->
   <assembly fullname="Assembly-CSharp" preserve="all"/>
   <assembly fullname="UnityEngine.UI" preserve="all"/>
+  <assembly fullname="UnityEngine.UIModule" preserve="all"/>
+  <assembly fullname="UnityEngine.CoreModule" preserve="all"/>
+  <assembly fullname="UnityEngine.InputLegacyModule" preserve="all"/>
 </linker>

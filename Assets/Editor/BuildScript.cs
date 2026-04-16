@@ -1,28 +1,28 @@
 using UnityEditor;
 using UnityEditor.Build.Reporting;
+using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class BuildScript
 {
     public static void Build()
     {
-        // GameBootstrap が RuntimeInitializeOnLoadMethod で起動するため
-        // 空シーン（または既存の Game.unity）どちらでも動作する。
-        string[] scenes = { "Assets/Scenes/Game.unity" };
-        string outputPath = "docs/Build";
+        // シーンをコードで生成してGUID不一致を完全回避
+        CreateScene();
 
-        // GitHub Pages は Content-Encoding: gzip を付与しないため圧縮無効
         PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Disabled;
 
+        string[] scenes = { "Assets/Scenes/Game.unity" };
         BuildPlayerOptions opt = new BuildPlayerOptions
         {
             scenes = scenes,
-            locationPathName = outputPath,
+            locationPathName = "docs/Build",
             target = BuildTarget.WebGL,
             options = BuildOptions.None
         };
 
-        Debug.Log($"Building WebGL to: {outputPath} (compression: disabled)");
+        Debug.Log("Building WebGL (compression: disabled)");
         BuildReport report = BuildPipeline.BuildPlayer(opt);
 
         if (report.summary.result == BuildResult.Succeeded)
@@ -32,5 +32,17 @@ public class BuildScript
             Debug.LogError($"Build failed: {report.summary.result}");
             EditorApplication.Exit(1);
         }
+    }
+
+    static void CreateScene()
+    {
+        var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+
+        // GameBootstrap を持つ GameObject を作成
+        var go = new GameObject("GameBootstrap");
+        go.AddComponent<GameBootstrap>();
+
+        EditorSceneManager.SaveScene(scene, "Assets/Scenes/Game.unity");
+        Debug.Log("Scene created: Assets/Scenes/Game.unity with GameBootstrap attached");
     }
 }
