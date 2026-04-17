@@ -112,13 +112,31 @@ public class BuildScript
             "},"
         );
 
-        // ④ デバッグオーバーレイ（3秒後に自動消去、エラー時は残す）
+        // ④ WebGL コンテキスト修正 + デバッグオーバーレイ
         const string debugUi = @"
     <div id='unity-dbg-overlay' style='position:fixed;top:0;left:0;right:0;
          max-height:40vh;overflow-y:auto;background:rgba(0,0,0,0.85);color:#39ff14;
          font:11px/1.4 monospace;padding:6px 8px;z-index:999999;pointer-events:none;
          white-space:pre-wrap;word-break:break-all;'></div>
     <script>
+      // ── WebGL コンテキスト修正 ───────────────────────────────────────────
+      // Unity は failIfMajorPerformanceCaveat:true でコンテキストを作成するため
+      // ブラウザの GPU 設定によっては Null Device にフォールバックする。
+      // false に強制してソフトウェアレンダリング (SwiftShader) も許可する。
+      (function() {
+        var _orig = HTMLCanvasElement.prototype.getContext;
+        HTMLCanvasElement.prototype.getContext = function(type, attrs) {
+          if (type === 'webgl2' || type === 'webgl' || type === 'webgl-experimental') {
+            attrs = Object.assign({}, attrs || {});
+            attrs.failIfMajorPerformanceCaveat = false;
+            attrs.powerPreference = attrs.powerPreference || 'default';
+          }
+          return _orig.call(this, type, attrs);
+        };
+        console.log('[DBG] WebGL context patch applied (failIfMajorPerformanceCaveat=false)');
+      })();
+
+      // ── デバッグオーバーレイ ─────────────────────────────────────────────
       var _dbgHasError = false;
       function dbg(msg, isError) {
         var el = document.getElementById('unity-dbg-overlay');
