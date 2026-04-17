@@ -112,19 +112,37 @@ public class BuildScript
             "},"
         );
 
-        // ③-b webglContextAttributes を config に追加（Unity 公式の方法）
+        // ③-b webglContextAttributes を config に追加
         html = html.Replace(
             "showBanner: unityShowBanner,",
 @"showBanner: unityShowBanner,
-        webglContextAttributes: {
-          failIfMajorPerformanceCaveat: false,
-          powerPreference: ""default"",
-          preserveDrawingBuffer: false,
-          antialias: false,
-          alpha: false,
-          depth: false,
-          stencil: false,
-        },"
+        webglContextAttributes: { failIfMajorPerformanceCaveat: false, powerPreference: ""default"" },"
+        );
+
+        // ③-c Safari WebGL2 Fix バイパス（根本修正）
+        // Unity の framework.js は canvas 要素に getContextSafariWebGL2Fixed を設定する。
+        // WebKit 環境でこれが正常な WebGL2 context を null と誤判定 → NullGfxDevice の原因。
+        // Object.defineProperty で canvas.getContext への代入をブロックして回避する。
+        const string webglFix = @"
+      (function() {
+        var canvas = document.getElementById('unity-canvas');
+        if (!canvas) return;
+        function patchedGetContext(type, attrs) {
+          attrs = Object.assign({}, attrs || {});
+          attrs.failIfMajorPerformanceCaveat = false;
+          return HTMLCanvasElement.prototype.getContext.call(canvas, type, attrs);
+        }
+        Object.defineProperty(canvas, 'getContext', {
+          get: function() { return patchedGetContext; },
+          set: function() { console.log('[DBG] canvas.getContext reassignment blocked'); },
+          configurable: true
+        });
+        console.log('[DBG] canvas.getContext locked: Safari WebGL2 fix bypassed');
+      })();
+";
+        html = html.Replace(
+            "      (function() {\n        var _orig = HTMLCanvasElement.prototype.getContext;",
+            webglFix + "      (function() {\n        var _orig = HTMLCanvasElement.prototype.getContext;"
         );
 
         // ④ WebGL コンテキスト修正 + デバッグオーバーレイ
