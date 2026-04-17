@@ -58,17 +58,18 @@
         dataUrl: buildUrl + "/docs.data",
         frameworkUrl: buildUrl + "/docs.framework.js",
         codeUrl: buildUrl + "/docs.wasm",
+        symbolsUrl: buildUrl + "/docs.symbols.json",
         streamingAssetsUrl: "StreamingAssets",
         companyName: "naullama",
         productName: "puzzle-2048",
         productVersion: "1.0",
         showBanner: unityShowBanner,
-        // errorHandler: function(err, url, line) {
-        //    alert("error " + err + " occurred at line " + line);
-        //    // Return 'true' if you handled this error and don't want Unity
-        //    // to process it further, 'false' otherwise.
-        //    return true;
-        // },
+        errorHandler: function(err, url, line) {
+            console.error('[Unity] ' + err + ' at ' + url + ':' + line);
+            // Return 'true' if you handled this error and don't want Unity
+            // to process it further, 'false' otherwise.
+            return false;
+        },
       };
 
       // By default, Unity keeps WebGL canvas render target size matched with
@@ -129,5 +130,17 @@
       document.body.appendChild(script);
 
     </script>
-  </body>
+  
+    <div id='unity-dbg-overlay' style='display:none;position:fixed;top:0;left:0;right:0;
+         max-height:45vh;overflow-y:auto;background:rgba(0,0,0,0.85);color:#39ff14;
+         font:12px/1.4 monospace;padding:6px 8px;z-index:999999;pointer-events:none;
+         white-space:pre-wrap;word-break:break-all;'></div>
+    <script>
+      // Unity ローダーのエラーをオーバーレイに表示
+      window.addEventListener('error', function(e) {
+        var el = document.getElementById('unity-dbg-overlay');
+        if (el) { el.style.display='block'; el.innerHTML += '[JS ERR] ' + e.message + '\n'; }
+      });
+    </script>
+</body>
 </html>

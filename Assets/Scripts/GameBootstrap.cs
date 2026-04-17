@@ -1,12 +1,20 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using UnityEngine;
 using UnityEngine.EventSystems;
+using UnityEngine.Scripting;
 using UnityEngine.UI;
 
-[UnityEngine.Scripting.Preserve]
+[Preserve]
 public class GameBootstrap : MonoBehaviour
 {
+#if UNITY_WEBGL && !UNITY_EDITOR
+    [DllImport("__Internal")] static extern void JsLog(string msg);
+#else
+    static void JsLog(string msg) => Debug.Log("[GB] " + msg);
+#endif
+    static void GLog(string msg) { Debug.Log("[GB] " + msg); try { JsLog(msg); } catch { } }
     // ────────── 定数 ──────────────────────────────────
     const int   SIZE = 4;
     const int   WIN  = 2048;
@@ -52,21 +60,28 @@ public class GameBootstrap : MonoBehaviour
 
     void Awake()
     {
+        GLog("Awake() 開始");
         try
         {
             status = "Building UI...";
+            GLog("PlayerPrefs 読み込み");
             best = PlayerPrefs.GetInt("Best2048", 0);
+            GLog("BuildCamera()");
             BuildCamera();
+            GLog("BuildUI()");
             BuildUI();
+            GLog("NewGame()");
             NewGame();
             uiReady = true;
             status = "Running";
+            GLog("起動完了");
         }
         catch (Exception ex)
         {
             status = "ERROR: " + ex.GetType().Name + ": " + ex.Message
                    + "\n" + ex.StackTrace;
             Debug.LogError(status);
+            try { JsLog("EXCEPTION: " + ex.GetType().Name + ": " + ex.Message); } catch { }
         }
     }
 
