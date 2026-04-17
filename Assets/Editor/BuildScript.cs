@@ -12,6 +12,8 @@ public class BuildScript
         CreateScene();
 
         PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Disabled;
+        PlayerSettings.SetManagedStrippingLevel(BuildTargetGroup.WebGL, ManagedStrippingLevel.Disabled);
+        PlayerSettings.WebGL.exceptionSupport = WebGLExceptionSupport.FullWithStacktrace;
 
         string[] scenes = { "Assets/Scenes/Game.unity" };
         BuildPlayerOptions opt = new BuildPlayerOptions

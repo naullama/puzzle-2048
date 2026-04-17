@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
+[UnityEngine.Scripting.Preserve]
 public class GameBootstrap : MonoBehaviour
 {
     // ────────── 定数 ──────────────────────────────────
