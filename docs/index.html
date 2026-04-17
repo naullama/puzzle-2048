@@ -188,22 +188,25 @@
       }
       dbg('JS: ページ読み込み完了');
 
-      // ── WebGL 動作テスト（Unity ロード前に実施） ─────────────────────────
+      // ── WebGL 全呼び出しトレース ─────────────────────────────────────────
       (function() {
+        // テスト
         var tc = document.createElement('canvas');
         var gl2 = tc.getContext('webgl2', {failIfMajorPerformanceCaveat: false});
-        if (gl2) {
-          dbg('WebGL2 OK: ' + gl2.getParameter(gl2.RENDERER) + ' | ' + gl2.getParameter(gl2.VENDOR));
-        } else {
-          var gl1 = tc.getContext('webgl', {failIfMajorPerformanceCaveat: false})
-                 || tc.getContext('experimental-webgl', {failIfMajorPerformanceCaveat: false});
-          if (gl1) {
-            dbg('WebGL2 不可 / WebGL1 OK: ' + gl1.getParameter(gl1.RENDERER), true);
-          } else {
-            dbg('WebGL 完全に使用不可 - ブラウザの設定を確認してください', true);
-          }
-        }
-        dbg('UA: ' + navigator.userAgent.substring(0, 80));
+        dbg(gl2 ? 'WebGL2 OK: ' + gl2.getParameter(gl2.RENDERER) : 'WebGL2 FAIL');
+        dbg('UA: ' + navigator.userAgent.substring(0, 100));
+
+        // prototype レベルで全 getContext 呼び出しをトレース
+        var _protoOrig = HTMLCanvasElement.prototype.getContext;
+        HTMLCanvasElement.prototype.getContext = function(type, attrs) {
+          var r = _protoOrig.call(this, type, attrs);
+          var id = this.id || this.tagName || '?';
+          var fmpc = attrs ? attrs.failIfMajorPerformanceCaveat : '-';
+          var mv   = attrs ? attrs.majorVersion : '-';
+          var rname = r ? (r.constructor ? r.constructor.name : typeof r) : 'NULL';
+          dbg('getContext('+type+') #'+id+' failIf='+fmpc+' maj='+mv+' → '+rname);
+          return r;
+        };
       })();
 
       // エラーがなければ 3 秒後に自動消去
