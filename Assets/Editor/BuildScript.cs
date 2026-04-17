@@ -100,17 +100,50 @@ public class BuildScript
         );
 
         // </body> の直前にデバッグ UI を追加
+        // ① overlay div は最初から visible（display:block）
+        // ② JS 段階のメッセージを Unity ロード前から記録
         const string debugUi = @"
-    <div id='unity-dbg-overlay' style='display:none;position:fixed;top:0;left:0;right:0;
+    <div id='unity-dbg-overlay' style='position:fixed;top:0;left:0;right:0;
          max-height:45vh;overflow-y:auto;background:rgba(0,0,0,0.85);color:#39ff14;
          font:12px/1.4 monospace;padding:6px 8px;z-index:999999;pointer-events:none;
          white-space:pre-wrap;word-break:break-all;'></div>
     <script>
+      function dbg(msg) {
+        var el = document.getElementById('unity-dbg-overlay');
+        if (!el) return;
+        var ts = (performance.now()/1000).toFixed(2);
+        el.innerHTML += '[' + ts + 's] ' + msg + '\n';
+        el.scrollTop = el.scrollHeight;
+        console.log('[DBG] ' + msg);
+      }
+      dbg('JS: ページ読み込み完了');
+
       // Unity ローダーのエラーをオーバーレイに表示
       window.addEventListener('error', function(e) {
-        var el = document.getElementById('unity-dbg-overlay');
-        if (el) { el.style.display='block'; el.innerHTML += '[JS ERR] ' + e.message + '\n'; }
+        dbg('JS ERR: ' + e.message + ' (' + e.filename + ':' + e.lineno + ')');
       });
+      window.addEventListener('unhandledrejection', function(e) {
+        dbg('JS PROMISE ERR: ' + e.reason);
+      });
+
+      // Unity の createUnityInstance をラップして状態を記録
+      var _origCreate = window.createUnityInstance;
+      window.createUnityInstance = function(canvas, config, onProgress) {
+        dbg('JS: createUnityInstance 呼び出し');
+        var promise = _origCreate(canvas, config, function(p) {
+          if (p === 0)   dbg('JS: Unity ロード開始 (0%)');
+          if (p >= 0.5 && p < 0.51) dbg('JS: Unity ロード 50%');
+          if (p >= 1.0)  dbg('JS: Unity ロード 100% - 初期化中');
+          if (onProgress) onProgress(p);
+        });
+        return promise.then(function(inst) {
+          dbg('JS: createUnityInstance 完了 - ゲーム開始');
+          return inst;
+        }).catch(function(err) {
+          dbg('JS: createUnityInstance 失敗: ' + err);
+          throw err;
+        });
+      };
     </script>
 ";
         html = html.Replace("</body>", debugUi + "</body>");

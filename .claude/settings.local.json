@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(C:/Program Files/Unity/Hub/Editor/6000.4.2f1/Editor/Unity.exe:*)",
+      "Bash(\"C:/Program Files/Unity/Hub/Editor/6000.4.2f1/Editor/Unity.exe\" -quit -batchmode -projectPath \"C:/Users/naull/Documents/01_projects/puzzle-2048\" -buildTarget WebGL -executeMethod BuildScript.Build -logfile \"C:/Users/naull/Documents/01_projects/puzzle-2048/unity_build.log\")",
+      "Bash(echo \"EXIT:$?\")",
+      "Bash(cp -r docs/Build/Build docs/Build docs/TemplateData docs/index.html .)",
+      "Bash(cp -r docs/Build/Build docs/)",
+      "Bash(cp -r docs/Build/TemplateData docs/)",
+      "Bash(cp docs/Build/index.html docs/index.html)",
+      "Bash(gunzip -k Build.data.gz)",
+      "Bash(gunzip -k Build.framework.js.gz)",
+      "Bash(gunzip -k Build.wasm.gz)",
+      "Bash(rm Build.data Build.framework.js Build.loader.js Build.wasm)",
+      "Bash(mv Build/* .)",
+      "Bash(rmdir Build)",
+      "Bash(rm -rf Build)",
+      "Bash(cp index.html ../index.html)",
+      "Bash(\"/c/Program Files/Unity/Hub/Editor/6000.4.2f1/Editor/Unity.exe\" -quit -batchmode -projectPath \"C:/Users/naull/Documents/01_projects/puzzle-2048\" -executeMethod BuildScript.Build -logFile -)",
+      "Bash(xxd \"C:/Users/naull/Documents/01_projects/puzzle-2048/docs/Build/docs.wasm\")"
+    ]
+  }
+}
