@@ -119,56 +119,23 @@ public class BuildScript
         webglContextAttributes: { failIfMajorPerformanceCaveat: false, powerPreference: ""default"" },"
         );
 
-        // ③-c Safari WebGL2 Fix バイパス（根本修正）
-        // Unity の framework.js は canvas 要素に getContextSafariWebGL2Fixed を設定する。
-        // WebKit 環境でこれが正常な WebGL2 context を null と誤判定 → NullGfxDevice の原因。
-        // Object.defineProperty で canvas.getContext への代入をブロックして回避する。
-        const string webglFix = @"
-      (function() {
-        var canvas = document.getElementById('unity-canvas');
-        if (!canvas) return;
-        function patchedGetContext(type, attrs) {
-          attrs = Object.assign({}, attrs || {});
-          attrs.failIfMajorPerformanceCaveat = false;
-          return HTMLCanvasElement.prototype.getContext.call(canvas, type, attrs);
-        }
-        Object.defineProperty(canvas, 'getContext', {
-          get: function() { return patchedGetContext; },
-          set: function() { console.log('[DBG] canvas.getContext reassignment blocked'); },
-          configurable: true
-        });
-        console.log('[DBG] canvas.getContext locked: Safari WebGL2 fix bypassed');
-      })();
-";
-        html = html.Replace(
-            "      (function() {\n        var _orig = HTMLCanvasElement.prototype.getContext;",
-            webglFix + "      (function() {\n        var _orig = HTMLCanvasElement.prototype.getContext;"
-        );
-
-        // ④ WebGL コンテキスト修正 + デバッグオーバーレイ
+        // ③-c デバッグオーバーレイ + WebGL NullGfxDevice 根本修正（全 canvas 対応版）
+        //
+        // 原因: framework.js の "Safari WebGL2 Fix" が fixedGetContext を canvas 要素に代入。
+        //       Chrome では WebGL2RenderingContext instanceof WebGLRenderingContext == true
+        //       のため fixedGetContext が (false == true) を評価し null を返す。
+        //       Unity の描画用 canvas は #unity-canvas と別要素（id なし）なので
+        //       #unity-canvas だけを修正しても効果がない。
+        //
+        // 修正: document.createElement('canvas') を intercept し、生成される全 canvas に
+        //       Object.defineProperty(writable:false, configurable:false) を適用して
+        //       fixedGetContext の代入を永続的にブロックする。
         const string debugUi = @"
     <div id='unity-dbg-overlay' style='position:fixed;top:0;left:0;right:0;
          max-height:40vh;overflow-y:auto;background:rgba(0,0,0,0.85);color:#39ff14;
          font:11px/1.4 monospace;padding:6px 8px;z-index:999999;pointer-events:none;
          white-space:pre-wrap;word-break:break-all;'></div>
     <script>
-      // ── WebGL コンテキスト修正 ───────────────────────────────────────────
-      // Unity は failIfMajorPerformanceCaveat:true でコンテキストを作成するため
-      // ブラウザの GPU 設定によっては Null Device にフォールバックする。
-      // false に強制してソフトウェアレンダリング (SwiftShader) も許可する。
-      (function() {
-        var _orig = HTMLCanvasElement.prototype.getContext;
-        HTMLCanvasElement.prototype.getContext = function(type, attrs) {
-          if (type === 'webgl2' || type === 'webgl' || type === 'webgl-experimental') {
-            attrs = Object.assign({}, attrs || {});
-            attrs.failIfMajorPerformanceCaveat = false;
-            attrs.powerPreference = attrs.powerPreference || 'default';
-          }
-          return _orig.call(this, type, attrs);
-        };
-        console.log('[DBG] WebGL context patch applied (failIfMajorPerformanceCaveat=false)');
-      })();
-
       // ── デバッグオーバーレイ ─────────────────────────────────────────────
       var _dbgHasError = false;
       function dbg(msg, isError) {
@@ -181,6 +148,61 @@ public class BuildScript
         console.log('[DBG] ' + msg);
       }
       dbg('JS: ページ読み込み完了');
+
+      // ── WebGL NullGfxDevice 根本修正（全 canvas 対応版） ─────────────────
+      (function() {
+        function lockCanvasGetContext(canvasEl) {
+          try {
+            var desc = Object.getOwnPropertyDescriptor(canvasEl, 'getContext');
+            if (desc && !desc.configurable && desc.value) return;
+            Object.defineProperty(canvasEl, 'getContext', {
+              value: function(type, attrs) {
+                attrs = Object.assign({}, attrs || {});
+                attrs.failIfMajorPerformanceCaveat = false;
+                return HTMLCanvasElement.prototype.getContext.call(canvasEl, type, attrs);
+              },
+              writable: false,
+              configurable: false,
+              enumerable: false
+            });
+            dbg('getContext locked (id=' + (canvasEl.id || '<no-id>') + ')');
+          } catch(e) {
+            dbg('canvas lock FAILED: ' + e, true);
+          }
+        }
+
+        document.querySelectorAll('canvas').forEach(lockCanvasGetContext);
+
+        var _origCreateEl = document.createElement;
+        document.createElement = function(tag) {
+          var el = _origCreateEl.apply(document, arguments);
+          if (typeof tag === 'string' && tag.toLowerCase() === 'canvas') {
+            lockCanvasGetContext(el);
+          }
+          return el;
+        };
+
+        dbg('Universal canvas.getContext lock installed');
+      })();
+
+      // ── WebGL 診断トレース ───────────────────────────────────────────────
+      (function() {
+        var tc = document.createElement('canvas');
+        var gl2 = tc.getContext('webgl2');
+        dbg(gl2 ? 'WebGL2 OK: ' + gl2.getParameter(gl2.RENDERER) : 'WebGL2 FAIL');
+        dbg('UA: ' + navigator.userAgent.substring(0, 100));
+
+        var _protoOrig = HTMLCanvasElement.prototype.getContext;
+        HTMLCanvasElement.prototype.getContext = function(type, attrs) {
+          var r = _protoOrig.call(this, type, attrs);
+          var id = this.id || this.tagName || '?';
+          var fmpc = attrs ? attrs.failIfMajorPerformanceCaveat : '-';
+          var mv   = attrs ? attrs.majorVersion : '-';
+          var rname = r ? (r.constructor ? r.constructor.name : typeof r) : 'NULL';
+          dbg('getContext('+type+') #'+id+' failIf='+fmpc+' maj='+mv+' → '+rname);
+          return r;
+        };
+      })();
 
       // エラーがなければ 3 秒後に自動消去
       setTimeout(function() {

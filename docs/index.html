@@ -145,36 +145,6 @@
          font:11px/1.4 monospace;padding:6px 8px;z-index:999999;pointer-events:none;
          white-space:pre-wrap;word-break:break-all;'></div>
     <script>
-      // ── WebGL NullGfxDevice 根本修正 ───────────────────────────────────
-      // 問題: Unity の docs.framework.js に Safari WebGL2 バグ回避コードが含まれている。
-      //       このコードは canvas 要素に getContext を上書きし、WebKit 環境では
-      //       正常な WebGL2 コンテキストを誤って null と判定して NullGfxDevice を引き起こす。
-      //
-      // 修正: Object.defineProperty で canvas.getContext への代入をブロックし、
-      //       常に正しい WebGL2 コンテキストを返す関数を強制する。
-      (function() {
-        var canvas = document.getElementById('unity-canvas');
-        if (!canvas) { console.warn('[DBG] canvas not found'); return; }
-
-        function patchedGetContext(type, attrs) {
-          attrs = Object.assign({}, attrs || {});
-          attrs.failIfMajorPerformanceCaveat = false;
-          // prototype を直接呼び出して canvas レベルの上書きを完全回避
-          return HTMLCanvasElement.prototype.getContext.call(canvas, type, attrs);
-        }
-
-        Object.defineProperty(canvas, 'getContext', {
-          get: function() { return patchedGetContext; },
-          set: function(fn) {
-            // Unity の getContextSafariWebGL2Fixed 代入をブロック
-            console.log('[DBG] canvas.getContext reassignment blocked (Safari WebGL2 fix bypass)');
-          },
-          configurable: true
-        });
-
-        console.log('[DBG] canvas.getContext locked: Safari WebGL2 fix bypassed');
-      })();
-
       // ── デバッグオーバーレイ ─────────────────────────────────────────────
       var _dbgHasError = false;
       function dbg(msg, isError) {
@@ -188,15 +158,65 @@
       }
       dbg('JS: ページ読み込み完了');
 
-      // ── WebGL 全呼び出しトレース ─────────────────────────────────────────
+      // ── WebGL NullGfxDevice 根本修正（全 canvas 対応版） ─────────────────
+      // 原因: framework.js の "Safari WebGL2 Fix" が fixedGetContext を canvas
+      //       要素に代入する。Chrome では
+      //         WebGL2RenderingContext instanceof WebGLRenderingContext == true
+      //       のため fixedGetContext が (false == true) を評価し null を返す。
+      //       → GL.createContext が 0 を返す → NullGfxDevice 選択。
+      //       かつ Unity の描画用 canvas は #unity-canvas とは別要素（id なし）。
+      //
+      // 修正: Object.defineProperty(writable:false, configurable:false) で
+      //       全 canvas 要素の getContext 代入を永続的にブロックする。
+      //       document.createElement('canvas') を intercept して
+      //       動的生成 canvas にも同じロックを適用する。
       (function() {
-        // テスト
+        function lockCanvasGetContext(canvasEl) {
+          try {
+            var desc = Object.getOwnPropertyDescriptor(canvasEl, 'getContext');
+            // 既に writable:false/configurable:false でロック済みならスキップ
+            if (desc && !desc.configurable && desc.value) return;
+            Object.defineProperty(canvasEl, 'getContext', {
+              value: function(type, attrs) {
+                attrs = Object.assign({}, attrs || {});
+                attrs.failIfMajorPerformanceCaveat = false;
+                // プロトタイプを直接呼び出して要素レベルの上書きを完全回避
+                return HTMLCanvasElement.prototype.getContext.call(canvasEl, type, attrs);
+              },
+              writable: false,
+              configurable: false,
+              enumerable: false
+            });
+            dbg('getContext locked (id=' + (canvasEl.id || '<no-id>') + ')');
+          } catch(e) {
+            dbg('canvas lock FAILED: ' + e, true);
+          }
+        }
+
+        // 既存の全 canvas を即座にロック
+        document.querySelectorAll('canvas').forEach(lockCanvasGetContext);
+
+        // これ以降に document.createElement('canvas') で生成される canvas もロック
+        var _origCreateEl = document.createElement;
+        document.createElement = function(tag) {
+          var el = _origCreateEl.apply(document, arguments);
+          if (typeof tag === 'string' && tag.toLowerCase() === 'canvas') {
+            lockCanvasGetContext(el);
+          }
+          return el;
+        };
+
+        dbg('Universal canvas.getContext lock installed');
+      })();
+
+      // ── WebGL 診断トレース ───────────────────────────────────────────────
+      (function() {
         var tc = document.createElement('canvas');
-        var gl2 = tc.getContext('webgl2', {failIfMajorPerformanceCaveat: false});
+        var gl2 = tc.getContext('webgl2');
         dbg(gl2 ? 'WebGL2 OK: ' + gl2.getParameter(gl2.RENDERER) : 'WebGL2 FAIL');
         dbg('UA: ' + navigator.userAgent.substring(0, 100));
 
-        // prototype レベルで全 getContext 呼び出しをトレース
+        // prototype レベルで全 getContext 呼び出しをトレース（診断用）
         var _protoOrig = HTMLCanvasElement.prototype.getContext;
         HTMLCanvasElement.prototype.getContext = function(type, attrs) {
           var r = _protoOrig.call(this, type, attrs);
