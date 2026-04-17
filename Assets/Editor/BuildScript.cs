@@ -112,6 +112,21 @@ public class BuildScript
             "},"
         );
 
+        // ③-b webglContextAttributes を config に追加（Unity 公式の方法）
+        html = html.Replace(
+            "showBanner: unityShowBanner,",
+@"showBanner: unityShowBanner,
+        webglContextAttributes: {
+          failIfMajorPerformanceCaveat: false,
+          powerPreference: ""default"",
+          preserveDrawingBuffer: false,
+          antialias: false,
+          alpha: false,
+          depth: false,
+          stencil: false,
+        },"
+        );
+
         // ④ WebGL コンテキスト修正 + デバッグオーバーレイ
         const string debugUi = @"
     <div id='unity-dbg-overlay' style='position:fixed;top:0;left:0;right:0;

@@ -66,9 +66,18 @@
         showBanner: unityShowBanner,
         errorHandler: function(err, url, line) {
             console.error('[Unity] ' + err + ' at ' + url + ':' + line);
-            // Return 'true' if you handled this error and don't want Unity
-            // to process it further, 'false' otherwise.
             return false;
+        },
+        // Unity 公式の WebGL コンテキスト属性指定
+        // failIfMajorPerformanceCaveat:false でソフトウェアレンダリング (SwiftShader) を許可
+        webglContextAttributes: {
+            failIfMajorPerformanceCaveat: false,
+            powerPreference: "default",
+            preserveDrawingBuffer: false,
+            antialias: false,
+            alpha: false,
+            depth: false,
+            stencil: false,
         },
       };
 
