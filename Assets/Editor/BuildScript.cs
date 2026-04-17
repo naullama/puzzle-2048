@@ -64,16 +64,29 @@ public class BuildScript
     }
 
     // ── index.html のパッチ ───────────────────────────────
-    // ビルド後に生成される index.html を書き換えて
-    // ① errorHandler を有効化（JS エラーを alert で表示）
-    // ② デバッグオーバーレイの初期化コードを追加
     static void PatchIndexHtml(string path)
     {
         if (!File.Exists(path)) { Debug.LogWarning("index.html not found: " + path); return; }
 
         string html = File.ReadAllText(path);
 
-        // errorHandler のコメントアウトを解除
+        // ① canvas 属性を 480×700（ゲームの参照解像度と一致）に変更
+        html = html.Replace(
+            "<canvas id=\"unity-canvas\" width=960 height=600 tabindex=\"-1\">",
+            "<canvas id=\"unity-canvas\" width=480 height=700 tabindex=\"-1\">"
+        );
+
+        // ② Desktop 時の canvas CSS サイズも 480×700 に変更
+        html = html.Replace(
+            "canvas.style.width = \"960px\";",
+            "canvas.style.width = \"480px\";"
+        );
+        html = html.Replace(
+            "canvas.style.height = \"600px\";",
+            "canvas.style.height = \"700px\";"
+        );
+
+        // ③ errorHandler のコメントアウトを解除
         html = html.Replace(
             "// errorHandler: function(err, url, line) {",
             "errorHandler: function(err, url, line) {"
@@ -99,18 +112,18 @@ public class BuildScript
             "},"
         );
 
-        // </body> の直前にデバッグ UI を追加
-        // ① overlay div は最初から visible（display:block）
-        // ② JS 段階のメッセージを Unity ロード前から記録
+        // ④ デバッグオーバーレイ（3秒後に自動消去、エラー時は残す）
         const string debugUi = @"
     <div id='unity-dbg-overlay' style='position:fixed;top:0;left:0;right:0;
-         max-height:45vh;overflow-y:auto;background:rgba(0,0,0,0.85);color:#39ff14;
-         font:12px/1.4 monospace;padding:6px 8px;z-index:999999;pointer-events:none;
+         max-height:40vh;overflow-y:auto;background:rgba(0,0,0,0.85);color:#39ff14;
+         font:11px/1.4 monospace;padding:6px 8px;z-index:999999;pointer-events:none;
          white-space:pre-wrap;word-break:break-all;'></div>
     <script>
-      function dbg(msg) {
+      var _dbgHasError = false;
+      function dbg(msg, isError) {
         var el = document.getElementById('unity-dbg-overlay');
         if (!el) return;
+        if (isError) { _dbgHasError = true; el.style.color = '#ff4444'; }
         var ts = (performance.now()/1000).toFixed(2);
         el.innerHTML += '[' + ts + 's] ' + msg + '\n';
         el.scrollTop = el.scrollHeight;
@@ -118,37 +131,25 @@ public class BuildScript
       }
       dbg('JS: ページ読み込み完了');
 
-      // Unity ローダーのエラーをオーバーレイに表示
+      // エラーがなければ 3 秒後に自動消去
+      setTimeout(function() {
+        if (!_dbgHasError) {
+          var el = document.getElementById('unity-dbg-overlay');
+          if (el) el.style.display = 'none';
+        }
+      }, 3000);
+
       window.addEventListener('error', function(e) {
-        dbg('JS ERR: ' + e.message + ' (' + e.filename + ':' + e.lineno + ')');
+        dbg('JS ERR: ' + e.message + ' (' + (e.filename||'') + ':' + e.lineno + ')', true);
       });
       window.addEventListener('unhandledrejection', function(e) {
-        dbg('JS PROMISE ERR: ' + e.reason);
+        dbg('JS PROMISE ERR: ' + e.reason, true);
       });
-
-      // Unity の createUnityInstance をラップして状態を記録
-      var _origCreate = window.createUnityInstance;
-      window.createUnityInstance = function(canvas, config, onProgress) {
-        dbg('JS: createUnityInstance 呼び出し');
-        var promise = _origCreate(canvas, config, function(p) {
-          if (p === 0)   dbg('JS: Unity ロード開始 (0%)');
-          if (p >= 0.5 && p < 0.51) dbg('JS: Unity ロード 50%');
-          if (p >= 1.0)  dbg('JS: Unity ロード 100% - 初期化中');
-          if (onProgress) onProgress(p);
-        });
-        return promise.then(function(inst) {
-          dbg('JS: createUnityInstance 完了 - ゲーム開始');
-          return inst;
-        }).catch(function(err) {
-          dbg('JS: createUnityInstance 失敗: ' + err);
-          throw err;
-        });
-      };
     </script>
 ";
         html = html.Replace("</body>", debugUi + "</body>");
 
         File.WriteAllText(path, html);
-        Debug.Log("index.html patched: errorHandler enabled, debug overlay added");
+        Debug.Log("index.html patched: canvas=480x700, overlay 3s auto-dismiss");
     }
 }
