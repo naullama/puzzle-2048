@@ -158,84 +158,70 @@
       }
       dbg('JS: ページ読み込み完了');
 
-      // ── WebGL NullGfxDevice 根本修正（全 canvas 対応版） ─────────────────
-      // 原因: framework.js の "Safari WebGL2 Fix" が fixedGetContext を canvas
-      //       要素に代入する。Chrome では
-      //         WebGL2RenderingContext instanceof WebGLRenderingContext == true
-      //       のため fixedGetContext が (false == true) を評価し null を返す。
-      //       → GL.createContext が 0 を返す → NullGfxDevice 選択。
-      //       かつ Unity の描画用 canvas は #unity-canvas とは別要素（id なし）。
+      // ── WebGL NullGfxDevice 根本修正 v3（getter/setter + Document.prototype） ──
+      // 原因: framework.js の "Safari WebGL2 Fix" が canvas.getContext = fixedGetContext
+      //       を代入。Chrome では WebGL2RenderingContext instanceof WebGLRenderingContext
+      //       == true のため fixedGetContext が null を返す → NullGfxDevice。
       //
-      // 修正: Object.defineProperty(writable:false, configurable:false) で
-      //       全 canvas 要素の getContext 代入を永続的にブロックする。
-      //       document.createElement('canvas') を intercept して
-      //       動的生成 canvas にも同じロックを適用する。
+      // v2 からの変更:
+      //   1. writable:false (value) → getter/setter 方式
+      //      → framework.js が strict mode の場合 writable:false への代入が TypeError
+      //        になって処理が中断する問題を回避。setter は no-op で代入を黙殺する。
+      //   2. document.createElement → Document.prototype.createElement をパッチ
+      //      → framework.js が Document.prototype.createElement を直接呼ぶ経路を補足。
       (function() {
-        function lockCanvasGetContext(canvasEl) {
+        // プロトタイプ参照を早期キャプチャ（後続のパッチに影響されないよう）
+        var _origGetCtx = HTMLCanvasElement.prototype.getContext;
+
+        function lockCanvasGetContext(el) {
           try {
-            var desc = Object.getOwnPropertyDescriptor(canvasEl, 'getContext');
-            // 既に writable:false/configurable:false でロック済みならスキップ
-            if (desc && !desc.configurable && desc.value) return;
-            Object.defineProperty(canvasEl, 'getContext', {
-              value: function(type, attrs) {
-                attrs = Object.assign({}, attrs || {});
-                attrs.failIfMajorPerformanceCaveat = false;
-                // プロトタイプを直接呼び出して要素レベルの上書きを完全回避
-                return HTMLCanvasElement.prototype.getContext.call(canvasEl, type, attrs);
+            var d = Object.getOwnPropertyDescriptor(el, 'getContext');
+            if (d && !d.configurable) return; // 既にロック済み
+            Object.defineProperty(el, 'getContext', {
+              get: function() {
+                return function(type, attrs) {
+                  return _origGetCtx.call(el, type,
+                    Object.assign({}, attrs || {}, { failIfMajorPerformanceCaveat: false }));
+                };
               },
-              writable: false,
+              set: function() {}, // no-op: strict mode でも TypeError を出さずに代入を無視
               configurable: false,
               enumerable: false
             });
-            dbg('getContext locked (id=' + (canvasEl.id || '<no-id>') + ')');
-          } catch(e) {
-            dbg('canvas lock FAILED: ' + e, true);
-          }
+            dbg('canvas locked id=' + (el.id || '<no-id>'));
+          } catch(e) { dbg('canvas lock FAILED: ' + e, true); }
         }
 
         // 既存の全 canvas を即座にロック
         document.querySelectorAll('canvas').forEach(lockCanvasGetContext);
 
-        // これ以降に document.createElement('canvas') で生成される canvas もロック
-        var _origCreateEl = document.createElement;
-        document.createElement = function(tag) {
-          var el = _origCreateEl.apply(document, arguments);
-          if (typeof tag === 'string' && tag.toLowerCase() === 'canvas') {
+        // Document.prototype.createElement をパッチして全生成経路を補足
+        var _origCreate = Document.prototype.createElement;
+        Document.prototype.createElement = function(tag) {
+          var el = _origCreate.apply(this, arguments);
+          if (typeof tag === 'string' && tag.toLowerCase() === 'canvas')
             lockCanvasGetContext(el);
-          }
           return el;
         };
 
-        dbg('Universal canvas.getContext lock installed');
+        dbg('canvas lock v3: getter/setter + Document.prototype.createElement');
       })();
 
-      // ── WebGL 診断トレース ───────────────────────────────────────────────
+      // ── WebGL 診断 ───────────────────────────────────────────────────────
       (function() {
         var tc = document.createElement('canvas');
         var gl2 = tc.getContext('webgl2');
         dbg(gl2 ? 'WebGL2 OK: ' + gl2.getParameter(gl2.RENDERER) : 'WebGL2 FAIL');
-        dbg('UA: ' + navigator.userAgent.substring(0, 100));
-
-        // prototype レベルで全 getContext 呼び出しをトレース（診断用）
-        var _protoOrig = HTMLCanvasElement.prototype.getContext;
-        HTMLCanvasElement.prototype.getContext = function(type, attrs) {
-          var r = _protoOrig.call(this, type, attrs);
-          var id = this.id || this.tagName || '?';
-          var fmpc = attrs ? attrs.failIfMajorPerformanceCaveat : '-';
-          var mv   = attrs ? attrs.majorVersion : '-';
-          var rname = r ? (r.constructor ? r.constructor.name : typeof r) : 'NULL';
-          dbg('getContext('+type+') #'+id+' failIf='+fmpc+' maj='+mv+' → '+rname);
-          return r;
-        };
+        dbg('UA: ' + navigator.userAgent.substring(0, 80));
       })();
 
-      // エラーがなければ 3 秒後に自動消去
+      // エラーがなければ 5 秒後に自動消去
       setTimeout(function() {
         if (!_dbgHasError) {
           var el = document.getElementById('unity-dbg-overlay');
           if (el) el.style.display = 'none';
         }
-      }, 3000);
+      }, 5000);
 
       window.addEventListener('error', function(e) {
         dbg('JS ERR: ' + e.message + ' (' + (e.filename||'') + ':' + e.lineno + ')', true);

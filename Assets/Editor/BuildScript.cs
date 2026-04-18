@@ -119,24 +119,17 @@ public class BuildScript
         webglContextAttributes: { failIfMajorPerformanceCaveat: false, powerPreference: ""default"" },"
         );
 
-        // ③-c デバッグオーバーレイ + WebGL NullGfxDevice 根本修正（全 canvas 対応版）
+        // ③-c デバッグオーバーレイ + WebGL NullGfxDevice 根本修正 v3
         //
-        // 原因: framework.js の "Safari WebGL2 Fix" が fixedGetContext を canvas 要素に代入。
-        //       Chrome では WebGL2RenderingContext instanceof WebGLRenderingContext == true
-        //       のため fixedGetContext が (false == true) を評価し null を返す。
-        //       Unity の描画用 canvas は #unity-canvas と別要素（id なし）なので
-        //       #unity-canvas だけを修正しても効果がない。
-        //
-        // 修正: document.createElement('canvas') を intercept し、生成される全 canvas に
-        //       Object.defineProperty(writable:false, configurable:false) を適用して
-        //       fixedGetContext の代入を永続的にブロックする。
+        // v3 変更点:
+        //   1. writable:false → getter/setter 方式（strict mode での TypeError 回避）
+        //   2. document.createElement → Document.prototype.createElement をパッチ
         const string debugUi = @"
     <div id='unity-dbg-overlay' style='position:fixed;top:0;left:0;right:0;
          max-height:40vh;overflow-y:auto;background:rgba(0,0,0,0.85);color:#39ff14;
          font:11px/1.4 monospace;padding:6px 8px;z-index:999999;pointer-events:none;
          white-space:pre-wrap;word-break:break-all;'></div>
     <script>
-      // ── デバッグオーバーレイ ─────────────────────────────────────────────
       var _dbgHasError = false;
       function dbg(msg, isError) {
         var el = document.getElementById('unity-dbg-overlay');
@@ -149,68 +142,56 @@ public class BuildScript
       }
       dbg('JS: ページ読み込み完了');
 
-      // ── WebGL NullGfxDevice 根本修正（全 canvas 対応版） ─────────────────
+      // ── WebGL NullGfxDevice 根本修正 v3（getter/setter + Document.prototype） ──
       (function() {
-        function lockCanvasGetContext(canvasEl) {
+        var _origGetCtx = HTMLCanvasElement.prototype.getContext;
+
+        function lockCanvasGetContext(el) {
           try {
-            var desc = Object.getOwnPropertyDescriptor(canvasEl, 'getContext');
-            if (desc && !desc.configurable && desc.value) return;
-            Object.defineProperty(canvasEl, 'getContext', {
-              value: function(type, attrs) {
-                attrs = Object.assign({}, attrs || {});
-                attrs.failIfMajorPerformanceCaveat = false;
-                return HTMLCanvasElement.prototype.getContext.call(canvasEl, type, attrs);
+            var d = Object.getOwnPropertyDescriptor(el, 'getContext');
+            if (d && !d.configurable) return;
+            Object.defineProperty(el, 'getContext', {
+              get: function() {
+                return function(type, attrs) {
+                  return _origGetCtx.call(el, type,
+                    Object.assign({}, attrs || {}, { failIfMajorPerformanceCaveat: false }));
+                };
               },
-              writable: false,
+              set: function() {},
               configurable: false,
               enumerable: false
             });
-            dbg('getContext locked (id=' + (canvasEl.id || '<no-id>') + ')');
-          } catch(e) {
-            dbg('canvas lock FAILED: ' + e, true);
-          }
+            dbg('canvas locked id=' + (el.id || '<no-id>'));
+          } catch(e) { dbg('canvas lock FAILED: ' + e, true); }
         }
 
         document.querySelectorAll('canvas').forEach(lockCanvasGetContext);
 
-        var _origCreateEl = document.createElement;
-        document.createElement = function(tag) {
-          var el = _origCreateEl.apply(document, arguments);
-          if (typeof tag === 'string' && tag.toLowerCase() === 'canvas') {
+        var _origCreate = Document.prototype.createElement;
+        Document.prototype.createElement = function(tag) {
+          var el = _origCreate.apply(this, arguments);
+          if (typeof tag === 'string' && tag.toLowerCase() === 'canvas')
             lockCanvasGetContext(el);
-          }
           return el;
         };
 
-        dbg('Universal canvas.getContext lock installed');
+        dbg('canvas lock v3: getter/setter + Document.prototype.createElement');
       })();
 
-      // ── WebGL 診断トレース ───────────────────────────────────────────────
+      // ── WebGL 診断 ───────────────────────────────────────────────────────
       (function() {
         var tc = document.createElement('canvas');
         var gl2 = tc.getContext('webgl2');
         dbg(gl2 ? 'WebGL2 OK: ' + gl2.getParameter(gl2.RENDERER) : 'WebGL2 FAIL');
-        dbg('UA: ' + navigator.userAgent.substring(0, 100));
-
-        var _protoOrig = HTMLCanvasElement.prototype.getContext;
-        HTMLCanvasElement.prototype.getContext = function(type, attrs) {
-          var r = _protoOrig.call(this, type, attrs);
-          var id = this.id || this.tagName || '?';
-          var fmpc = attrs ? attrs.failIfMajorPerformanceCaveat : '-';
-          var mv   = attrs ? attrs.majorVersion : '-';
-          var rname = r ? (r.constructor ? r.constructor.name : typeof r) : 'NULL';
-          dbg('getContext('+type+') #'+id+' failIf='+fmpc+' maj='+mv+' → '+rname);
-          return r;
-        };
+        dbg('UA: ' + navigator.userAgent.substring(0, 80));
       })();
 
-      // エラーがなければ 3 秒後に自動消去
       setTimeout(function() {
         if (!_dbgHasError) {
           var el = document.getElementById('unity-dbg-overlay');
           if (el) el.style.display = 'none';
         }
-      }, 3000);
+      }, 5000);
 
       window.addEventListener('error', function(e) {
         dbg('JS ERR: ' + e.message + ' (' + (e.filename||'') + ':' + e.lineno + ')', true);
