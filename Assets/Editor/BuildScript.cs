@@ -131,6 +131,7 @@ public class BuildScript
          font:11px/1.4 monospace;padding:6px 8px;z-index:999999;pointer-events:none;
          white-space:pre-wrap;word-break:break-all;'></div>
     <script>
+      var _origConsoleLog = console.log;
       var _dbgHasError = false;
       function dbg(msg, isError) {
         var el = document.getElementById('unity-dbg-overlay');
@@ -139,7 +140,7 @@ public class BuildScript
         var ts = (performance.now()/1000).toFixed(2);
         el.innerHTML += '[' + ts + 's] ' + msg + '\n';
         el.scrollTop = el.scrollHeight;
-        console.log('[DBG] ' + msg);
+        _origConsoleLog('[DBG] ' + msg);
       }
       dbg('JS: ページ読み込み完了');
 
@@ -193,7 +194,7 @@ public class BuildScript
         function intercept(orig, prefix, isError) {
           return function() {
             var msg = Array.prototype.slice.call(arguments).join(' ');
-            if (/shader|renderer|webgl|null device|error|warning/i.test(msg))
+            if (msg.indexOf('[DBG]') < 0 && /shader|renderer|webgl|null.?device/i.test(msg))
               dbg(prefix + msg.substring(0, 300), isError);
             orig.apply(console, arguments);
           };

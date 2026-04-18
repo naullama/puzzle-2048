@@ -139,6 +139,9 @@
          white-space:pre-wrap;word-break:break-all;'></div>
     <script>
       // ── デバッグオーバーレイ ─────────────────────────────────────────────
+      // console.log をインターセプトする前にオリジナルを保持しておく
+      // （dbg が console.log を呼ぶとインターセプトと循環するのを防ぐ）
+      var _origConsoleLog = console.log;
       var _dbgHasError = false;
       function dbg(msg, isError) {
         var el = document.getElementById('unity-dbg-overlay');
@@ -147,7 +150,7 @@
         var ts = (performance.now()/1000).toFixed(2);
         el.innerHTML += '[' + ts + 's] ' + msg + '\n';
         el.scrollTop = el.scrollHeight;
-        console.log('[DBG] ' + msg);
+        _origConsoleLog('[DBG] ' + msg); // インターセプト前のオリジナルを使用
       }
       dbg('JS: ページ読み込み完了');
 
@@ -209,14 +212,14 @@
       })();
 
       // ── Unity 内部ログのインターセプト ────────────────────────────────────
-      // Unity の framework.js は console.log/warn/error にメッセージを出力する
+      // dbg() は _origConsoleLog を使うため、ここで置き換えても循環しない
       (function() {
         var _log = console.log, _warn = console.warn, _err = console.error;
         function intercept(orig, prefix, isError) {
           return function() {
             var msg = Array.prototype.slice.call(arguments).join(' ');
-            // Shader/Renderer/WebGL 関連メッセージのみ表示
-            if (/shader|renderer|webgl|null device|error|warning/i.test(msg))
+            // [DBG] 自身のメッセージを除外してループを防ぐ
+            if (msg.indexOf('[DBG]') < 0 && /shader|renderer|webgl|null.?device/i.test(msg))
               dbg(prefix + msg.substring(0, 300), isError);
             orig.apply(console, arguments);
           };
