@@ -113,6 +113,7 @@ public class BuildScript
         );
 
         // ③-b webglContextAttributes を config に追加
+        // depth/stencil/alpha は省略して Unity デフォルトに任せる（false にすると黒画面になる）
         html = html.Replace(
             "showBanner: unityShowBanner,",
 @"showBanner: unityShowBanner,
@@ -184,6 +185,22 @@ public class BuildScript
         var gl2 = tc.getContext('webgl2');
         dbg(gl2 ? 'WebGL2 OK: ' + gl2.getParameter(gl2.RENDERER) : 'WebGL2 FAIL');
         dbg('UA: ' + navigator.userAgent.substring(0, 80));
+      })();
+
+      // ── Unity 内部ログのインターセプト ────────────────────────────────────
+      (function() {
+        var _log = console.log, _warn = console.warn, _err = console.error;
+        function intercept(orig, prefix, isError) {
+          return function() {
+            var msg = Array.prototype.slice.call(arguments).join(' ');
+            if (/shader|renderer|webgl|null device|error|warning/i.test(msg))
+              dbg(prefix + msg.substring(0, 300), isError);
+            orig.apply(console, arguments);
+          };
+        }
+        console.log   = intercept(_log,  'LOG: ',  false);
+        console.warn  = intercept(_warn, 'WARN: ', false);
+        console.error = intercept(_err,  'ERR: ',  true);
       })();
 
       setTimeout(function() {
