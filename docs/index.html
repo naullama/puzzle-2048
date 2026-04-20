@@ -190,22 +190,23 @@
         dbg('canvas lock v3: getter/setter + Document.prototype.createElement');
       })();
 
-      // ── WebGL 診断 ───────────────────────────────────────────────────────
+      // ── WebGL 診断（コンテキスト消費なし） ──────────────────────────────
       (function() {
-        var tc = document.createElement('canvas');
-        var gl2 = tc.getContext('webgl2');
-        dbg(gl2 ? 'WebGL2 OK: ' + gl2.getParameter(gl2.RENDERER) : 'WebGL2 FAIL');
+        dbg(typeof WebGL2RenderingContext !== 'undefined' ? 'WebGL2: available' : 'WebGL2: UNAVAILABLE',
+            typeof WebGL2RenderingContext === 'undefined');
         dbg('UA: ' + navigator.userAgent.substring(0, 80));
       })();
 
       // ── Unity 内部ログのインターセプト ────────────────────────────────────
       (function() {
         var _log = console.log, _warn = console.warn, _err = console.error;
-        function intercept(orig, prefix, isError) {
+        function intercept(orig, prefix, isErr) {
           return function() {
             var msg = Array.prototype.slice.call(arguments).join(' ');
-            if (msg.indexOf('[DBG]') < 0 && /shader|renderer|webgl|null.?device/i.test(msg))
-              dbg(prefix + msg.substring(0, 300), isError);
+            if (msg.indexOf('[DBG]') < 0 && /shader|renderer|webgl|null.?device/i.test(msg)) {
+              var fatal = /null.?device|Null Device/i.test(msg) || /not supported on this GPU|ERROR.*Shader/i.test(msg);
+              dbg(prefix + msg.substring(0, 300), isErr || fatal);
+            }
             orig.apply(console, arguments);
           };
         }
