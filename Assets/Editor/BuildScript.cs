@@ -25,20 +25,6 @@ public class BuildScript
         // 初期メモリを 256MB に引き上げ（デフォルト 32MB は不足する場合あり）
         PlayerSettings.WebGL.initialMemorySize = 256;
 
-        // ── WebGL 非対応の組み込みシェーダーを無効化 ──────────────────────
-        // ScreenSpaceShadows / Deferred 系は WebGL2 で実行時に ERROR: Shader となり
-        // NullGfxDevice へフォールバックする原因になる
-        GraphicsSettings.SetShaderModeForBuiltinShaderType(
-            BuiltinShaderType.ScreenSpaceShadows, BuiltinShaderMode.Disabled);
-        GraphicsSettings.SetShaderModeForBuiltinShaderType(
-            BuiltinShaderType.DeferredShading, BuiltinShaderMode.Disabled);
-        GraphicsSettings.SetShaderModeForBuiltinShaderType(
-            BuiltinShaderType.DeferredReflections, BuiltinShaderMode.Disabled);
-        GraphicsSettings.SetShaderModeForBuiltinShaderType(
-            BuiltinShaderType.DepthNormals, BuiltinShaderMode.Disabled);
-        GraphicsSettings.SetShaderModeForBuiltinShaderType(
-            BuiltinShaderType.MotionVectors, BuiltinShaderMode.Disabled);
-
         // シャドウを品質設定でも無効化
         QualitySettings.shadows = ShadowQuality.Disable;
 
