@@ -61,7 +61,7 @@ public static class GameDiagnostics
     {
         Log("5/5 AfterSceneLoad - シーン読み込み完了");
 
-        var gb = Object.FindFirstObjectByType<GameBootstrap>();
+        var gb = Object.FindAnyObjectByType<GameBootstrap>();
         if (gb != null)
         {
             Log("GameBootstrap: 検出 OK (シーンに存在)");
