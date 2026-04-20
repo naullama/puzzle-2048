@@ -87,10 +87,20 @@ public class BuildScript
 
         string html = File.ReadAllText(path);
 
-        // ① canvas 属性を 480×700（ゲームの参照解像度と一致）に変更
+        // ① canvas を 480×700 に修正・display:block 明示
         html = html.Replace(
             "<canvas id=\"unity-canvas\" width=960 height=600 tabindex=\"-1\">",
-            "<canvas id=\"unity-canvas\" width=480 height=700 tabindex=\"-1\">"
+            "<canvas id=\"unity-canvas\" width=\"480\" height=\"700\" tabindex=\"-1\" style=\"display: block;\">"
+        );
+
+        // ①-b <head> に html/body/canvas 表示 CSS を注入
+        html = html.Replace(
+            "</head>",
+@"  <style>
+      html, body { width: 100%; height: 100%; margin: 0; padding: 0; overflow: hidden; }
+      canvas { display: block; }
+    </style>
+  </head>"
         );
 
         // ② Desktop 時の canvas CSS サイズも 480×700 に変更

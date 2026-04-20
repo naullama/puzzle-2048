@@ -6,10 +6,14 @@
     <title>Unity Web Player | puzzle-2048</title>
     <link rel="shortcut icon" href="TemplateData/favicon.ico">
     <link rel="stylesheet" href="TemplateData/style.css">
+    <style>
+      html, body { width: 100%; height: 100%; margin: 0; padding: 0; overflow: hidden; }
+      canvas { display: block; }
+    </style>
   </head>
   <body>
     <div id="unity-container" class="unity-desktop">
-      <canvas id="unity-canvas" width=480 height=700 tabindex="-1"></canvas>
+      <canvas id="unity-canvas" width="480" height="700" tabindex="-1" style="display: block;"></canvas>
       <div id="unity-loading-bar">
         <div id="unity-logo"></div>
         <div id="unity-progress-bar-empty">
